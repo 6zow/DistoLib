@@ -1,6 +1,7 @@
 package ru.shizow.proxy.transform;
 
 import org.objectweb.asm.*;
+import ru.shizow.proxy.InjectionProvider;
 import ru.shizow.proxy.MethodProxy;
 
 import java.util.HashMap;
@@ -8,7 +9,15 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
+/**
+ * The {@link ClassAdapter} which changes annotated methods and creates an initializer for annotated fields.
+ *
+ * @author Max Gorbunov
+ */
 public class ProxyAdapter extends ClassAdapter implements Opcodes {
+    /**
+     * The name of the injection initializer method.
+     */
     static final String INJECT_INIT_NAME = "!inject";
     private final Set<String> proxyAnnotationDescriptors;
     private final Set<String> injectAnnotationDescriptors;
@@ -33,6 +42,17 @@ public class ProxyAdapter extends ClassAdapter implements Opcodes {
         className = name;
     }
 
+    /**
+     * Creates an adapter for constructors and annotated methods.
+     *
+     * @param access     {@inheritDoc}
+     * @param name       {@inheritDoc}
+     * @param desc       {@inheritDoc}
+     * @param signature  {@inheritDoc}
+     * @param exceptions {@inheritDoc}
+     * @return {@inheritDoc}
+     * @see ProxyMethodAdapter
+     */
     @Override
     public MethodVisitor visitMethod(int access, final String name, final String desc, String signature,
                                      String[] exceptions) {
@@ -40,6 +60,16 @@ public class ProxyAdapter extends ClassAdapter implements Opcodes {
         return new ProxyMethodAdapter(mv, access, name, desc, proxyAnnotationDescriptors, className);
     }
 
+    /**
+     * Collects the names and types of fields with injection annotations.
+     *
+     * @param access    {@inheritDoc}
+     * @param name      {@inheritDoc}
+     * @param fieldDesc {@inheritDoc}
+     * @param signature {@inheritDoc}
+     * @param value     {@inheritDoc}
+     * @return {@inheritDoc}
+     */
     @Override
     public FieldVisitor visitField(int access, final String name, final String fieldDesc, String signature,
                                    Object value) {
@@ -65,6 +95,13 @@ public class ProxyAdapter extends ClassAdapter implements Opcodes {
         };
     }
 
+    /**
+     * Adds the injection initialization method.
+     * This method initializes all annotated fields by calling an {@link InjectionProvider}.
+     *
+     * @see #INJECT_INIT_NAME
+     * @see MethodProxy#getInjectValue(Object, String)
+     */
     @Override
     public void visitEnd() {
         MethodVisitor mv = super.visitMethod(ACC_PRIVATE, INJECT_INIT_NAME, "()V", null, null);

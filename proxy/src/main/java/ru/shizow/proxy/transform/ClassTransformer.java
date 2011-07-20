@@ -9,6 +9,8 @@ import java.io.InputStream;
 
 /**
  * The helper class which transforms the class' bytecode with the {@link ProxyAdapter} class.
+ *
+ * @author Max Gorbunov
  */
 public class ClassTransformer {
 
@@ -17,13 +19,14 @@ public class ClassTransformer {
      * annotated with one the {@code proxyMethodAnnotations}
      * and initializes fields annotated with one of the {@code injectAnnotations}.
      *
-     * @param inputStream
-     * @param proxyMethodAnnotations
-     * @param injectAnnotations
-     * @return
-     * @throws IOException
+     * @param inputStream            the input stream with the original class' bytecode
+     * @param proxyMethodAnnotations annotations which mean that a method must be proxied
+     * @param injectAnnotations      annotations which mean that a resource must be injected in a field
+     * @return modified bytecode
+     * @throws IOException if the original bytecode can't be read
      */
-    public static byte[] transformClass(InputStream inputStream, Class<?>[] proxyMethodAnnotations, Class<?>[] injectAnnotations)
+    public static byte[] transformClass(InputStream inputStream,
+                                        Class<?>[] proxyMethodAnnotations, Class<?>[] injectAnnotations)
             throws IOException {
         ClassReader cr = new ClassReader(inputStream);
         ClassWriter cw = new ClassWriter(cr, 0);

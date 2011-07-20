@@ -12,19 +12,27 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
+/**
+ * The method adapter which adds initialization method calls to all constructors and
+ * proxy calls to annotated methods.
+ *
+ * @author Max Gorbunov
+ * @see MethodProxy
+ * @see ProxyAdapter#INJECT_INIT_NAME
+ */
 public class ProxyMethodAdapter extends AdviceAdapter {
     private final String name;
     private final String desc;
-    private final Set<String> annotationDescriptors;
+    private final Set<String> proxyAnnotationDescriptors;
     private final String className;
     private boolean dataAware;
 
-    public ProxyMethodAdapter(MethodVisitor mv, int access, String name, String desc, Set<String> annotationDescriptors,
-                              String className) {
+    public ProxyMethodAdapter(MethodVisitor mv, int access, String name, String desc,
+                              Set<String> proxyAnnotationDescriptors, String className) {
         super(mv, access, name, desc);
         this.name = name;
         this.desc = desc;
-        this.annotationDescriptors = annotationDescriptors;
+        this.proxyAnnotationDescriptors = proxyAnnotationDescriptors;
         this.className = className;
     }
 
@@ -57,17 +65,37 @@ public class ProxyMethodAdapter extends AdviceAdapter {
         throw new IllegalArgumentException("Invalid method description");
     }
 
+    /**
+     * Determines if this method is annotated with one of the {@link #proxyAnnotationDescriptors}.
+     *
+     * @param desc    {@inheritDoc}
+     * @param visible {@inheritDoc}
+     * @return {@inheritDoc}
+     */
     @Override
     public AnnotationVisitor visitAnnotation(String desc, boolean visible) {
-        if (annotationDescriptors.contains(desc)) {
+        if (proxyAnnotationDescriptors.contains(desc)) {
             dataAware = true;
+            // TODO: check for static, throw exception if static method is annotated
         }
         return super.visitAnnotation(desc, visible);
     }
 
+    /**
+     * Adds the code to the beginning of a method or a constructor.
+     * <p/>
+     * If this is a constructor, the initialization call is added
+     * (see {@link ProxyAdapter#INJECT_INIT_NAME}, {@link ru.shizow.proxy.transform.ProxyAdapter#visitEnd()}).
+     * <p/>
+     * If this is an annotated method, the proxy call is added after the check if it's needed.
+     * Static methods proxying is not supported.
+     */
     @Override
     protected void onMethodEnter() {
         if (name.equals("<init>")) {
+            if (dataAware) {
+                throw new IllegalStateException("Constructor proxying is not supported");
+            }
             mv.visitIntInsn(ALOAD, 0);
             mv.visitMethodInsn(INVOKESPECIAL, className, ProxyAdapter.INJECT_INIT_NAME, "()V");
         }
@@ -145,6 +173,12 @@ public class ProxyMethodAdapter extends AdviceAdapter {
         }
     }
 
+    /**
+     * Modifies the maximum stack depth if required.
+     *
+     * @param maxStack  {@inheritDoc}
+     * @param maxLocals {@inheritDoc}
+     */
     @Override
     public void visitMaxs(int maxStack, int maxLocals) {
         super.visitMaxs(Math.max(maxStack, 8), maxLocals);
