@@ -3,11 +3,10 @@ package ru.shizow.proxy.transform;
 import ru.shizow.proxy.InjectionProvider;
 import ru.shizow.proxy.InvocationDelegate;
 import ru.shizow.proxy.MethodProxy;
+import ru.shizow.proxy.test.TestHelper;
 
 import java.lang.annotation.Annotation;
-import java.net.URL;
 import java.util.Arrays;
-import java.util.Collection;
 
 import org.junit.Assert;
 import org.junit.Test;
@@ -32,43 +31,13 @@ public class ProxyAdapterTest {
                 return MethodProxy.invoke(target, methodName, descriptor, params);
             }
         });
-        URL resource = this.getClass().getClassLoader().getResource(
-                this.getClass().getCanonicalName().replace('.', '/') + ".class");
-        resource = new URL(resource.toString().substring(0,
-                resource.toString().length() - this.getClass().getCanonicalName().length() - ".class".length()));
-        final String auxTestClassName = this.getClass().getCanonicalName() + "$AuxTest";
-        TransformingUrlClassLoader loader = new TransformingUrlClassLoader(new URL[]{resource},
-                new Class<?>[]{Proxy.class}, new Class<?>[]{Resource.class}) {
-
-            @Override
-            protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
-                // First, check if the class has already been loaded
-                Class c = findLoadedClass(name);
-                if (c == null) {
-                    if (!name.equals(auxTestClassName)) {
-                        return super.loadClass(name, resolve);
-                    }
-                    try {
-                        c = findClass(name);
-                        if (resolve) {
-                            resolveClass(c);
-                        }
-                        return c;
-                    } catch (ClassNotFoundException e) {
-                        //
-                    }
-                }
-                return super.loadClass(name, resolve);
-            }
-        };
-        Class<?> aClass = loader.loadClass(auxTestClassName);
-        Object o = aClass.newInstance();
-        aClass.getMethod("test").invoke(o);
-//        new AuxTest().test();
+        TestHelper.getTest(AuxTest.class, new Class[0], new Class<?>[]{Proxy.class}, new Class<?>[]{Resource.class})
+                .test();
     }
 
-    public static class AuxTest {
+    public static class AuxTest implements TestHelper.TestInterface {
 
+        @Override
         public void test() {
             empty();
             Assert.assertTrue(z(false));
@@ -160,56 +129,10 @@ public class ProxyAdapterTest {
         public int chain2(int x) {
             return x + 1;
         }
-
-        int partitions;
-        int partition;
-
-        @DistributedProxy(reduceMethod = "sumInts")
-        public int sumPrimes(int max) {
-            int ans = 0;
-            for (int i = 2 + partition; i <= max; i += partitions) {
-                if (isPrime(i)) {
-                    ans += i;
-                }
-            }
-            return ans;
-        }
-
-        @DistributedProxy(reduceMethod = "andBools")
-        private boolean isPrime(int n) {
-            int max = (int) Math.sqrt(n + 1);
-            for (int i = 2 + partition; i <= max; i += partitions) {
-                if (n % i == 0) {
-                    return false;
-                }
-            }
-            return true;
-        }
-
-        public int sumInts(Collection<Integer> elems) {
-            int ans = 0;
-            for (int i : elems) {
-                ans += i;
-            }
-            return ans;
-        }
-
-        public boolean andBools(Collection<Boolean> elems) {
-            for (boolean b : elems) {
-                if (!b) {
-                    return false;
-                }
-            }
-            return true;
-        }
     }
 }
 
 @interface Proxy {
-}
-
-@interface DistributedProxy {
-    public String reduceMethod();// default "";
 }
 
 @interface Resource {

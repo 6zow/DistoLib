@@ -22,6 +22,7 @@ public class MethodProxy {
      *
      * @return {@code true} if the calling method requires proxying
      */
+    @SuppressWarnings({"UnusedDeclaration"})
     public static boolean requiresProxying() {
         // TODO: make it JRE independent (don't use sun.reflect.Reflection)
         return invocationDelegate != null && Reflection.getCallerClass(3) != MethodProxy.class;
@@ -37,6 +38,7 @@ public class MethodProxy {
      * @param params     actual method parameters. The primitive types are boxed.
      * @return an object returned by a proxied method. The primitive types must be boxed.
      */
+    @SuppressWarnings({"UnusedDeclaration"})
     public static Object __invoke(Object target, String methodName, String descriptor, Object[] params) {
         return invocationDelegate.invoke(target, methodName, descriptor, params);
     }
@@ -53,16 +55,22 @@ public class MethodProxy {
     public static Object invoke(Object target, String methodName, String descriptor, Object[] params) {
         try {
             Class<?> clazz = target.getClass();
-            // TODO: cache results
-            Class<?>[] argTypes = getArgTypes(descriptor, clazz.getClassLoader());
-            Method m = clazz.getMethod(methodName, argTypes);
+            Method m = getMethod(clazz, methodName, descriptor);
             return m.invoke(target, params);
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
     }
 
-    private static Class<?>[] getArgTypes(String descriptor, ClassLoader classLoader) throws ClassNotFoundException {
+    public static Method getMethod(Class<?> clazz, String methodName, String descriptor) throws NoSuchMethodException {
+        // TODO: cache results
+        Class<?>[] argTypes = getArgTypes(descriptor, clazz.getClassLoader());
+        Method method = clazz.getDeclaredMethod(methodName, argTypes);
+        method.setAccessible(true);
+        return method;
+    }
+
+    private static Class<?>[] getArgTypes(String descriptor, ClassLoader classLoader) {
         Type[] argumentTypes = Type.getArgumentTypes(descriptor);
         Class<?>[] argTypes = new Class<?>[argumentTypes.length];
         for (int i = 0; i < argTypes.length; i++) {
@@ -74,7 +82,11 @@ public class MethodProxy {
                 if (ch == '[') {
                     className = type.getDescriptor().replace('/', '.');
                 }
-                argTypes[i] = Class.forName(className, false, classLoader);
+                try {
+                    argTypes[i] = Class.forName(className, false, classLoader);
+                } catch (ClassNotFoundException e) {
+                    throw new RuntimeException(e);
+                }
             } else {
                 argTypes[i] = TypeUtil.PRIM_CLASSES[idx];
             }
